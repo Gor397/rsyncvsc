@@ -1,26 +1,66 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import { getConfig, validateConfig } from './config';
+import { syncFile } from './rsync';
+import { SyncStatusBar } from './statusBar';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+	console.log('=== rsyncvsc extension activated ===');
+	vscode.window.showInformationMessage('rsyncvsc extension activated');
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "rsyncvsc" is now active!');
+	const statusBar = new SyncStatusBar();
+	const outputChannel = vscode.window.createOutputChannel('rsyncvsc');
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('rsyncvsc.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from rsyncvsc!');
+	// manual sync command
+	const syncCommand = vscode.commands.registerCommand(
+		'rsyncvsc.syncFile',
+		async () => {
+			const editor = vscode.window.activeTextEditor;
+			if (!editor) { return; }
+			await doSync(editor.document, statusBar, outputChannel);
+		}
+	);
+
+	// sync on save
+	const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
+		const config = getConfig();
+		if (!config.enabled) { return; }
+		await doSync(doc, statusBar, outputChannel);
 	});
 
-	context.subscriptions.push(disposable);
+	context.subscriptions.push(statusBar, syncCommand, onSave, outputChannel);
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+async function doSync(
+	doc: vscode.TextDocument,
+	statusBar: SyncStatusBar,
+	output: vscode.OutputChannel
+) {
+	const config = getConfig();
+	const validationError = validateConfig(config);
+
+	if (validationError) {
+		vscode.window.showErrorMessage(validationError);
+		return;
+	}
+
+	const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+	if (!workspaceRoot) { return; }
+
+	const fileName = doc.uri.fsPath;
+	statusBar.syncing(fileName);
+	output.appendLine(`[${new Date().toISOString()}] Syncing ${fileName}...`);
+
+	const result = await syncFile(fileName, workspaceRoot, config);
+
+	if (result.success) {
+		statusBar.success(fileName);
+		output.appendLine(`✓ Done\n${result.output}`);
+	} else {
+		statusBar.error(result.error ?? 'Unknown error');
+		output.appendLine(`✗ Failed: ${result.error}`);
+		output.show(); // pop open the output panel on error
+		vscode.window.showErrorMessage(`rsync failed: ${result.error}`);
+	}
+}
+
+export function deactivate() { }
