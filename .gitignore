@@ -1,0 +1,57 @@
+# Node modules
+node_modules/
+
+# Compiled output
+dist/
+out/
+build/
+
+# VS Code extension packaging
+*.vsix
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code workspace settings
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+
+# ESLint cache
+.eslintcache
+
+# Parcel/Vite cache
+.parcel-cache/
+.vite/
+
+# Turbo
+.turbo/
+
+# Optional package manager locks
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
