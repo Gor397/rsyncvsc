@@ -1,71 +1,125 @@
-# rsyncvsc README
+# rsyncvsc
 
-This is the README for your extension "rsyncvsc". After writing up a brief description, we recommend including the following sections.
+Automatically sync your VS Code workspace to a remote server using `rsync` over SSH — on save or on demand.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- **Sync on save** — workspace is synced to the remote every time you save a file
+- **Manual sync** — run `rsync: Sync Workspace` from the command palette anytime
+- **Config file per project** — settings live in `.rsyncvscconfig` at the workspace root, not in VS Code settings
+- **Exclude support** — ignore files via an exclude file or inline patterns in the config
+- **SSH agent support** — works with `ssh-agent` so no key path is required if your key is already loaded
+- **Status bar indicator** — shows sync state (idle, syncing, success, error) at a glance
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- `rsync` must be installed and available in `PATH`
+- SSH access to the remote server (either via key or `ssh-agent`)
 
-## Extension Settings
+## Setup
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+**1. Create `.rsyncvscconfig` in your workspace root**
 
-For example:
+The extension only activates when this file is present. Create it with at minimum:
 
-This extension contributes the following settings:
+```json
+{
+    "enabled": true,
+    "remoteHost": "user@192.168.1.100",
+    "remotePath": "/var/www/myproject",
+    "extraArgs": ["-avz", "--delete"]
+}
+```
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+**2. Set up SSH authentication**
+
+You have two options:
+
+**Option A — SSH key (explicit)**
+
+Generate a key pair and copy the public key to the remote server:
+
+```bash
+ssh-keygen -t rsa -b 4096
+ssh-copy-id user@192.168.1.100
+```
+
+Then add the key path to your config:
+
+```json
+{
+    "privateKeyPath": "~/.ssh/id_rsa"
+}
+```
+
+**Option B — ssh-agent (no key path needed)**
+
+If your key is already loaded in `ssh-agent`, just omit `privateKeyPath` entirely. The extension will authenticate through the agent automatically.
+
+```bash
+ssh-add ~/.ssh/id_rsa   # run once; macOS/Windows load keys automatically on login
+```
+
+## Configuration
+
+All configuration lives in `.rsyncvscconfig` at the workspace root. The file supports `//` comments.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `enabled` | boolean | yes | Set to `true` to enable sync on save |
+| `remoteHost` | string | yes | Remote host in `user@host` format |
+| `remotePath` | string | yes | Absolute path on the remote to sync into |
+| `extraArgs` | string[] | no | Extra arguments passed to rsync (default: `["-avz", "--delete"]`) |
+| `privateKeyPath` | string | no | Path to SSH private key. Omit to use `ssh-agent` |
+| `rsyncIgnoreFile` | string | no | Path to an exclude file (one pattern per line). Takes precedence over `rsyncIgnorePatterns` |
+| `rsyncIgnorePatterns` | string[] | no | Inline list of exclude patterns. Used only when `rsyncIgnoreFile` is not set |
+
+### Path formats
+
+All path fields (`privateKeyPath`, `rsyncIgnoreFile`) accept:
+
+- **Relative** — resolved against the workspace root: `".rsyncignore"`
+- **Tilde** — expanded to home directory: `"~/.ssh/id_rsa"`
+- **Absolute** — used as-is: `"/home/user/.ssh/id_rsa"`
+
+### Full example
+
+```json
+{
+    "enabled": true,
+    "remoteHost": "user@192.168.1.100",
+    "remotePath": "/var/www/myproject",
+    "privateKeyPath": "~/.ssh/id_rsa",
+    "extraArgs": ["-avz", "--delete"],
+
+    // Option A: point to an ignore file
+    "rsyncIgnoreFile": ".rsyncignore",
+
+    // Option B: inline patterns (used only if rsyncIgnoreFile is not set)
+    "rsyncIgnorePatterns": [
+        "node_modules",
+        ".git",
+        "dist",
+        "*.log",
+        ".env",
+        ".DS_Store"
+    ]
+}
+```
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `rsync: Sync Workspace` | Manually trigger a full workspace sync |
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+- Sync runs on every file save. There is no debounce for rapid successive saves.
+- Password-based SSH authentication is not supported. Use an SSH key or `ssh-agent`.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.0.1
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Initial release.
