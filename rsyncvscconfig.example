@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "remoteHost": "user@192.168.1.100",
+  "remotePath": "/var/www/myproject",
+  "privateKeyPath": "~/.ssh/id_rsa",
+  "extraArgs": ["-avz", "--delete"],
+
+  // Option A: point to an ignore file (like .gitignore syntax)
+  // "rsyncIgnoreFile": "~/.rsyncignore",
+
+  // Option B: inline patterns (used only if rsyncIgnoreFile is not set)
+  "rsyncIgnorePatterns": [
+    "node_modules",
+    ".git",
+    "dist",
+    "*.log",
+    ".env",
+    ".DS_Store"
+  ]
+}

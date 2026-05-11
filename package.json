@@ -1,7 +1,7 @@
 {
     "name": "rsyncvsc",
     "displayName": "rsyncvsc",
-    "description": "",
+    "description": "Sync workspace to remote server via rsync",
     "version": "0.0.1",
     "engines": {
         "vscode": "^1.118.0"
@@ -10,51 +10,14 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:rsyncvsc.syncFile",
-        "onCommand:rsyncvsc.helloWorld",
-        "workspaceContains:**/*"
+        "workspaceContains:.rsyncvscconfig"
     ],
     "main": "./dist/extension.js",
     "contributes": {
-        "configuration": {
-            "title": "rsyncvsc",
-            "properties": {
-                "rsyncvsc.remotePath": {
-                    "type": "string",
-                    "default": "",
-                    "description": "The destination path on the remote server for rsync. (e.g, user@host:/path/to/destination)"
-                },
-                "rsyncvsc.privateKeyPath": {
-                    "type": "string",
-                    "default": "",
-                    "description": "The path to the private key for SSH authentication. (e.g, ~/.ssh/id_rsa)"
-                },
-                "rsyncvsc.enabled": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable sync on save"
-                },
-                "rsyncvsc.extraArgs": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "default": [
-                        "-avz",
-                        "--delete"
-                    ],
-                    "description": "Extra arguments passed to rsync"
-                }
-            }
-        },
         "commands": [
             {
-                "command": "rsyncvsc.helloWorld",
-                "title": "Hello World"
-            },
-            {
-                "command": "rsyncvsc.syncFile",
-                "title": "rsync: Sync Current File"
+                "command": "rsyncvsc.syncWorkspace",
+                "title": "rsync: Sync Workspace"
             }
         ]
     },

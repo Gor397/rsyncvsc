@@ -8,32 +8,37 @@ export interface SyncResult {
     error?: string;
 }
 
-function buildArgs(
-    localFile: string,
-    workspaceRoot: string,
-    config: RsyncConfig
-): string[] {
-    // preserve relative path structure on remote
-    // e.g. local:  /workspace/src/foo.ts
-    // remote:      user@host:/var/www/project/src/foo.ts
-    const relativePath = path.relative(workspaceRoot, localFile);
-    const remoteTarget = `${config.remotePath}/${relativePath}`;
+function buildArgs(workspaceRoot: string, config: RsyncConfig): string[] {
+    // Trailing slash on source tells rsync to sync the *contents* of the
+    // workspace directory into remotePath, preserving the tree structure.
+    const localSource = workspaceRoot.endsWith('/') ? workspaceRoot : `${workspaceRoot}/`;
+    const remoteTarget = `${config.remoteHost}:${config.remotePath}`;
 
-    return [
+    const args: string[] = [
         ...config.extraArgs,
         '-e', `ssh -i ${config.privateKeyPath} -o StrictHostKeyChecking=no`,
-        localFile,
-        remoteTarget,
     ];
+
+    // Exclude / filter rules — ignore file wins over inline patterns
+    if (config.rsyncIgnoreFile) {
+        // --exclude-from treats each line as an exclude pattern
+        args.push('--exclude-from', config.rsyncIgnoreFile);
+    } else if (config.rsyncIgnorePatterns && config.rsyncIgnorePatterns.length > 0) {
+        for (const pattern of config.rsyncIgnorePatterns) {
+            args.push('--exclude', pattern);
+        }
+    }
+
+    args.push(localSource, remoteTarget);
+    return args;
 }
 
-export function syncFile(
-    localFile: string,
+export function syncWorkspace(
     workspaceRoot: string,
     config: RsyncConfig
 ): Promise<SyncResult> {
     return new Promise((resolve) => {
-        const args = buildArgs(localFile, workspaceRoot, config);
+        const args = buildArgs(workspaceRoot, config);
 
         execFile('rsync', args, (error, stdout, stderr) => {
             if (error) {

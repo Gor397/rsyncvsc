@@ -1,64 +1,91 @@
 import * as vscode from 'vscode';
-import { getConfig, validateConfig } from './config';
-import { syncFile } from './rsync';
+import { loadConfig, validateConfig, CONFIG_FILENAME } from './config';
+import { syncWorkspace } from './rsync';
 import { SyncStatusBar } from './statusBar';
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('=== rsyncvsc extension activated ===');
-	vscode.window.showInformationMessage('rsyncvsc extension activated');
 
 	const statusBar = new SyncStatusBar();
 	const outputChannel = vscode.window.createOutputChannel('rsyncvsc');
 
-	// manual sync command
+	// Manual sync command
 	const syncCommand = vscode.commands.registerCommand(
-		'rsyncvsc.syncFile',
+		'rsyncvsc.syncWorkspace',
 		async () => {
-			const editor = vscode.window.activeTextEditor;
-			if (!editor) { return; }
-			await doSync(editor.document, statusBar, outputChannel);
+			await doSync(statusBar, outputChannel);
 		}
 	);
 
-	// sync on save
+	// Sync on save
 	const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
-		const config = getConfig();
-		if (!config.enabled) { return; }
-		await doSync(doc, statusBar, outputChannel);
+		// Skip syncing the config file itself to avoid loops
+		if (doc.uri.fsPath.endsWith(CONFIG_FILENAME)) { return; }
+
+		const { config } = loadConfig();
+		if (!config?.enabled) { return; }
+
+		await doSync(statusBar, outputChannel);
 	});
 
+	// Watch for .rsyncvscconfig being created / deleted so the status bar
+	// reflects availability without requiring a restart.
+	const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+	if (workspaceRoot) {
+		const watcher = vscode.workspace.createFileSystemWatcher(
+			new vscode.RelativePattern(workspaceRoot, CONFIG_FILENAME)
+		);
+		watcher.onDidCreate(() => statusBar.idle());
+		watcher.onDidDelete(() => statusBar.noConfig());
+		context.subscriptions.push(watcher);
+	}
+
 	context.subscriptions.push(statusBar, syncCommand, onSave, outputChannel);
+
+	// Reflect initial state
+	const { found, error: initError } = loadConfig();
+	if (!found && !initError) { statusBar.noConfig(); }
 }
 
 async function doSync(
-	doc: vscode.TextDocument,
 	statusBar: SyncStatusBar,
 	output: vscode.OutputChannel
 ) {
-	const config = getConfig();
-	const validationError = validateConfig(config);
+	const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+	if (!workspaceRoot) { return; }
 
-	if (validationError) {
-		vscode.window.showErrorMessage(validationError);
+	const { config, found, error: loadError } = loadConfig();
+
+	// .rsyncvscconfig absent → silently do nothing
+	if (!found && !loadError) { return; }
+
+	// File exists but couldn't be read or parsed → surface the error
+	if (loadError || !config) {
+		vscode.window.showErrorMessage(`rsyncvsc: ${loadError ?? 'Failed to load config'}`);
 		return;
 	}
 
-	const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
-	if (!workspaceRoot) { return; }
+	if (!config.enabled) { return; }
 
-	const fileName = doc.uri.fsPath;
-	statusBar.syncing(fileName);
-	output.appendLine(`[${new Date().toISOString()}] Syncing ${fileName}...`);
+	const validationError = validateConfig(config);
+	if (validationError) {
+		vscode.window.showErrorMessage(`rsyncvsc: ${validationError}`);
+		return;
+	}
 
-	const result = await syncFile(fileName, workspaceRoot, config);
+	statusBar.syncing(workspaceRoot);
+	output.appendLine(`[${new Date().toISOString()}] Syncing workspace: ${workspaceRoot}`);
+	output.appendLine(`  → ${config.remoteHost}:${config.remotePath}`);
+
+	const result = await syncWorkspace(workspaceRoot, config);
 
 	if (result.success) {
-		statusBar.success(fileName);
+		statusBar.success(workspaceRoot);
 		output.appendLine(`✓ Done\n${result.output}`);
 	} else {
 		statusBar.error(result.error ?? 'Unknown error');
 		output.appendLine(`✗ Failed: ${result.error}`);
-		output.show(); // pop open the output panel on error
+		output.show();
 		vscode.window.showErrorMessage(`rsync failed: ${result.error}`);
 	}
 }
