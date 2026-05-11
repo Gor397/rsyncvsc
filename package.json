@@ -1,8 +1,14 @@
 {
     "name": "rsyncvsc",
-    "displayName": "rsyncvsc",
+    "displayName": "rsyncVSC",
     "description": "Sync workspace to remote server via rsync",
     "version": "0.0.1",
+    "publisher": "GorSimonyan",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Gor397/rsyncvsc"
+    },
     "engines": {
         "vscode": "^1.118.0"
     },
